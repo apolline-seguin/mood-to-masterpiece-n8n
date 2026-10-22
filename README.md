@@ -98,10 +98,8 @@ No secret is stored in this repository. The workflow JSON only contains credenti
 3. **Create the credentials** listed in section 4 (Telegram API, Groq API, Supabase API).
 4. **Import the workflows** in n8n: **Workflows → ⋯ (top right) → Import from file**, then choose:
    - `workflows/mood-to-masterpiece.json`
-   - `workflows/error-alert.json`
 5. **Attach the credentials.** Open each Telegram, Groq and Supabase node and select your credential in the **Credential** field.
-6. **Link the error workflow.** In the main workflow, **⋯ → Settings → Error workflow →** `Error alert`. In `Error alert`, set the **Chat ID** of the Telegram node to your own chat id.
-7. **Publish** the main workflow (top right **Publish**). Do not click **Execute workflow** afterwards: Telegram allows one webhook at a time and a test run replaces the production one.
+6. **Publish** the main workflow (top right **Publish**). Do not click **Execute workflow** afterwards: Telegram allows one webhook at a time and a test run replaces the production one.
 
 ## How to test
 
@@ -115,7 +113,6 @@ Send these messages to the bot. No click in n8n is needed once the workflow is p
 | Unknown command | `hello` | Usage message with an example |
 | Help | `/help` | The list of commands |
 | No result | a mood the museum cannot match | "No artwork found" message |
-| Failure | In the museum node, break the URL, publish, send `/mood sad` | After the retries, the alert arrives on Telegram. Restore the URL and publish again |
 
 Then open **Executions** in n8n: each run is listed, and you can open a run to see the data at every node.
 
@@ -124,7 +121,6 @@ Then open **Executions** in n8n: each run is listed, and you can open a run to s
 - **Retry On Fail** on every call to an outside service (museum API, Groq, Supabase), with max tries and wait set, for short outages and rate limits.
 - **Fallback sentence** when the AI answers nothing or fails (Art note continues on error, Note or fallback fills in).
 - **Invalid input** (missing argument, unknown text) returns a usage message instead of failing.
-- **Error workflow** (Error Trigger) sends a Telegram alert with the workflow name and the execution URL.
 - **Parallel branches:** if the database save fails, the photo still arrives.
 
 
@@ -158,6 +154,5 @@ mood-to-masterpiece/
 ├── .env.example
 └── workflows/
     ├── mood-to-masterpiece.json
-    └── error-alert.json
 ```
 
