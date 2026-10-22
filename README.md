@@ -73,20 +73,27 @@ No secret is stored in this repository. The workflow JSON only contains credenti
 
 1. **Clone** the repository and open it:
    ```bash
-   git clone https://github.com/<<YOUR-GITHUB-USERNAME>>/mood-to-masterpiece.git
+   git clone https://github.com/apolline-seguin/mood-to-masterpiece.git
    cd mood-to-masterpiece
    ```
 2. **Create the database table.** In Supabase, open **SQL Editor → New query**, paste and run:
    ```sql
-   -- adapt the columns to the ones used by the "Save mood log" node
-   create table mood_log (
-     id         bigint generated always as identity primary key,
+   -- 
+   create table public.mood_log (
+     id bigint generated always as identity primary key,
      created_at timestamptz not null default now(),
-     chat_id    bigint not null,
-     mood       text,
-     title      text,
-     artist     text
+     chat_id bigint not null,
+     first_name text,
+     mood text,
+     keyword text,
+     artwork_id bigint,
+     title text,
+     artist text,
+     image_url text,
+     art_note text
    );
+   alter table public.mood_log enable row level security;
+   grant all on table public.mood_log to service_role;
    ```
 3. **Create the credentials** listed in section 4 (Telegram API, Groq API, Supabase API).
 4. **Import the workflows** in n8n: **Workflows → ⋯ (top right) → Import from file**, then choose:
