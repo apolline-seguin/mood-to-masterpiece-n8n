@@ -1,0 +1,763 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -336,
+        -32
+      ],
+      "id": "7376121f-e7a0-4da3-a6b5-03a224e388f8",
+      "name": "Message received",
+      "webhookId": "d3b1cf0c-e7b3-48e1-8b11-7287835f0ef3",
+      "credentials": {
+        "telegramApi": {
+          "id": "c7Oc0JWZelF8kQxn",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json.message || {};\nconst text = String(msg.text || '').trim();\nconst chatId = msg.chat?.id;\nconst firstName = msg.from?.first_name || 'friend';\n\n// English mood -> English museum keywords (the museum catalogue is in English)\nconst dictionary = {\n  'sad': ['melancholy', 'sorrow', 'tears', 'rain'],\n  'melancholic': ['melancholy', 'twilight', 'solitude'],\n  'nostalgic': ['memory', 'childhood', 'old town', 'autumn'],\n  'happy': ['dance', 'celebration', 'sunshine', 'garden'],\n  'joyful': ['dance', 'festival', 'flowers', 'sunshine'],\n  'in love': ['lovers', 'kiss', 'romance', 'rose'],\n  'angry': ['storm', 'battle', 'fire', 'fury'],\n  'anxious': ['storm', 'night', 'fog', 'scream'],\n  'stressed': ['storm', 'crowd', 'night', 'fog'],\n  'scared': ['night', 'shadow', 'storm', 'ghost'],\n  'tired': ['sleep', 'rest', 'night', 'dream'],\n  'calm': ['lake', 'still life', 'moonlight', 'meadow'],\n  'peaceful': ['lake', 'garden', 'morning', 'water lilies'],\n  'lonely': ['solitude', 'lone', 'empty street', 'window'],\n  'curious': ['explorer', 'map', 'telescope', 'library'],\n  'dreamy': ['dream', 'clouds', 'moon', 'fantasy'],\n  'hopeful': ['sunrise', 'dawn', 'spring', 'bird'],\n  'proud': ['hero', 'portrait', 'crown', 'victory'],\n  'bored': ['waiting', 'empty room', 'afternoon', 'clock'],\n  'excited': ['carnival', 'parade', 'fireworks', 'dance'],\n  'grateful': ['harvest', 'feast', 'garden', 'sunlight']\n};\n\n// lower case, no accents, single spaces, no filler words like \"very\" or \"I am\"\nconst normalize = s => {\n  let t = s.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/[’']/g, ' ').replace(/[^a-z\\s-]/g, ' ').replace(/\\s+/g, ' ').trim();\n  const filler = /^(i am|i m|im|feeling|feel|so|very|really|quite|a bit|super|extremely)\\s+/;\n  while (filler.test(t)) t = t.replace(filler, '');\n  return t;\n};\n\nlet command = 'unknown';\nlet rest = '';\nconst m = text.match(/^\\/(\\w+)(?:@\\w+)?\\s*([\\s\\S]*)$/);\nif (m) {\n  const cmd = m[1].toLowerCase();\n  rest = m[2];\n  if (cmd === 'mood') command = 'mood';\n  else if (cmd === 'history') command = 'history';\n  else if (cmd === 'help' || cmd === 'start') command = 'help';\n}\n\nlet mood = '';\nlet keyword = '';\nlet valid = false;\nif (command === 'mood') {\n  mood = normalize(rest);\n  valid = /[a-z]{3,}/.test(mood) && mood.length <= 40;\n  if (valid) {\n    const options = dictionary[mood];\n    keyword = options ? options[Math.floor(Math.random() * options.length)] : mood;\n  }\n}\n\nreturn [{ json: { chatId, firstName, text, command, mood, keyword, valid } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        -16
+      ],
+      "id": "bf5fd7e1-7250-42bc-927f-88e5643ee16f",
+      "name": "Parse command"
+    },
+    {
+      "parameters": {
+        "url": "https://openaccess-api.clevelandart.org/api/artworks/",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.keyword }}"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            },
+            {
+              "name": "has_image",
+              "value": "1"
+            },
+            {
+              "name": "cc0",
+              "value": "1"
+            },
+            {
+              "name": "limit",
+              "value": "20"
+            },
+            {
+              "name": "fields",
+              "value": "id,title,creation_date,creators,images,url"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        432,
+        -32
+      ],
+      "id": "42bef374-0750-4924-92b4-79e7bc1e2d8b",
+      "name": "Search museum API"
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\n\n// keep only artworks that have a web image\nconst works = (res.data || []).filter(a => a.images?.web?.url);\n\nif (works.length === 0) {\n  return [{ json: { found: false } }];\n}\n\nconst a = works[Math.floor(Math.random() * works.length)];\nconst creator = (a.creators && a.creators[0] && a.creators[0].description) || 'Unknown artist';\n\nreturn [{\n  json: {\n    found: true,\n    artworkId: a.id,\n    title: a.title || 'Untitled',\n    artist: creator.split('\\n')[0].trim(),\n    date: a.creation_date || 'date unknown',\n    imageUrl: a.images.web.url,\n    artworkUrl: a.url || 'https://www.clevelandart.org'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -16
+      ],
+      "id": "096d2c04-da6c-4077-904b-c8ec38c217ae",
+      "name": "Find artwork"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $json.chat_id }}",
+        "file": "={{ $json.image_url }}",
+        "additionalFields": {
+          "caption": "={{ $json.caption }}",
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1840,
+        16
+      ],
+      "id": "86371c58-6f3e-46c4-90a0-20f16e4465fb",
+      "name": "Send artwork",
+      "webhookId": "df21bbbb-4ee5-4c66-8814-7cba34ac6ecc",
+      "credentials": {
+        "telegramApi": {
+          "id": "c7Oc0JWZelF8kQxn",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a friendly, knowledgeable museum guide who makes art history feel easy and fun for beginners.\nA person told me they feel: \"{{ $('Parse command').first().json.mood }}\".\nI am showing them this artwork:\n- Title: {{ $json.title }}\n- Artist: {{ $json.artist }}\n- Date: {{ $json.date }}\n\nWrite a short note in English, 70 words maximum, in 2 or 3 sentences:\n1. Say who the artist is and give one real fact about them or their art movement.\n2. Say why this piece could echo the person's mood.\nRules: only state facts you are sure about. If you are not sure about the piece itself, talk about the artist or the period in general terms. Do not describe visual details you cannot see. Speak to the person as \"you\". No quotation marks, no markdown, no emojis.",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1008,
+        16
+      ],
+      "id": "4b31db49-c71a-4d02-87af-56cc92de36b5",
+      "name": "Art note",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        272
+      ],
+      "id": "57cd267b-47d3-4068-a524-f76ec70d7646",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "lvSbJ1ctsOYinYrZ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cb688127-88de-4972-acc3-f45b050c6f89",
+              "name": "art_note",
+              "value": "={{ ($json.text || $json.output) ? String($json.text || $json.output).trim() : \"Our guide is resting, so here is the artwork itself: \" + $('Find artwork').first().json.title + \" by \" + $('Find artwork').first().json.artist + \" (\" + $('Find artwork').first().json.date + \").\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1312,
+        16
+      ],
+      "id": "4e3ee9e5-7064-4b5b-b98b-4d8bd346e50f",
+      "name": "Note or fallback"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsed = $('Parse command').first().json;\nconst art = $('Find artwork').first().json;\nconst note = String($json.art_note || '').trim().slice(0, 600);\n\n// Telegram HTML mode: escape special characters\nconst esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst caption =\n`🎨 <b>${esc(art.title.slice(0, 100))}</b>\n${esc(art.artist.slice(0, 100))}, ${esc(art.date)}\n\n<i>${esc(note)}</i>\n\n🔗 <a href=\"${art.artworkUrl}\">See the artwork at the Cleveland Museum of Art</a>`;\n\nreturn [{\n  json: {\n    chat_id: parsed.chatId,\n    first_name: parsed.firstName,\n    mood: parsed.mood,\n    keyword: parsed.keyword,\n    artwork_id: art.artworkId,\n    title: art.title,\n    artist: art.artist,\n    image_url: art.imageUrl,\n    art_note: note,\n    caption\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        16
+      ],
+      "id": "86890796-97fa-425a-ab58-c9e142666f8a",
+      "name": "Format caption"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "projectRef": "hlyvarousfoqkpzyhgkx",
+        "tableId": "mood_log",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "chat_id",
+              "fieldValue": "={{ $json.chat_id }}"
+            },
+            {
+              "fieldId": "first_name",
+              "fieldValue": "={{ $json.first_name }}"
+            },
+            {
+              "fieldId": "mood",
+              "fieldValue": "={{ $json.mood }}"
+            },
+            {
+              "fieldId": "keyword",
+              "fieldValue": "={{ $json.keyword }}"
+            },
+            {
+              "fieldId": "artwork_id",
+              "fieldValue": "={{ $json.artwork_id }}"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "artist",
+              "fieldValue": "={{ $json.artist }}"
+            },
+            {
+              "fieldId": "image_url",
+              "fieldValue": "={{ $json.image_url }}"
+            },
+            {
+              "fieldId": "art_note",
+              "fieldValue": "={{ $json.art_note }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1856,
+        208
+      ],
+      "id": "9fd57884-e5dd-4c8f-bffd-90c1dc5c0e5a",
+      "name": "Save mood log",
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": "z5VsvM8tAHdsHmHz",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "mood",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7d825413-14f4-4644-98dc-f7ad4caa15b8"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3f49205d-9541-4f01-85f0-7e6981b98aa3",
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "history",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1c298f12-21d5-4ecc-bd4e-9bfc132977ac",
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        32,
+        128
+      ],
+      "id": "a3a39e1a-be82-466b-9b28-73bccdbd4342",
+      "name": "Route by command"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4c98cb9a-975a-4fd7-9d06-8524bc45dbed",
+              "leftValue": "={{ $json.valid === true }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        -32
+      ],
+      "id": "c767e593-cf98-496a-b06a-5c5e1b0b10b1",
+      "name": "Mood provided?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6d911028-7bc0-418e-8f7b-af2ec85ceca0",
+              "leftValue": "={{ $json.found === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        160
+      ],
+      "id": "32f11612-6ff9-4eed-bff1-005aa372a27f",
+      "name": "Artwork found?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Parse command').first().json.chatId }}",
+        "text": "Tell me your mood and I will find you an artwork, for example: /mood nostalgic Type /help to see all commands.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        464,
+        400
+      ],
+      "id": "ab3707eb-037c-4268-895f-752df6e75b71",
+      "name": "Usage message",
+      "webhookId": "8afee67b-37b4-4749-a25e-30e4b6d02885",
+      "credentials": {
+        "telegramApi": {
+          "id": "c7Oc0JWZelF8kQxn",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Parse command').first().json.chatId }}",
+        "text": "I could not find an artwork for that mood. Try another word, for example: /mood calm",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        928,
+        384
+      ],
+      "id": "4eabed21-9a45-43ff-8b1c-504b8ba1abe3",
+      "name": "No artwork found",
+      "webhookId": "7e460cb2-727b-41db-9479-563ba6d4f883",
+      "credentials": {
+        "telegramApi": {
+          "id": "c7Oc0JWZelF8kQxn",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Parse command').first().json.chatId }}",
+        "text": "Mood to Masterpiece  /mood sad - I find you an artwork that matches your mood /history - your last 5 moods /help - show this message",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        272,
+        208
+      ],
+      "id": "a4258944-bc90-4527-995b-02c434a0c473",
+      "name": "Help message",
+      "webhookId": "a0cd0229-1841-4e12-ba30-08f5f3b6f3d5",
+      "credentials": {
+        "telegramApi": {
+          "id": "c7Oc0JWZelF8kQxn",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "getAll",
+        "projectRef": "hlyvarousfoqkpzyhgkx",
+        "tableId": "mood_log",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "chat_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Parse command').first().json.chatId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        480,
+        112
+      ],
+      "id": "6b46b311-0e4c-411f-9a06-14f6cc409067",
+      "name": "Get history",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseOAuth2Api": {
+          "id": "z5VsvM8tAHdsHmHz",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const chatId = $('Parse command').first().json.chatId;\nconst rows = $input.all().map(i => i.json).filter(r => r.mood);\nrows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));\nconst last = rows.slice(0, 5);\n\nlet text;\nif (last.length === 0) {\n  text = \"You have no mood history yet. Try /mood sad to get your first artwork!\";\n} else {\n  text = \"Your last \" + last.length + \" moods:\\n\\n\" +\n    last.map((r, i) => (i + 1) + \". \" + r.mood + \" - \" + r.title + \" by \" + r.artist).join(\"\\n\");\n}\nreturn [{ json: { chat_id: chatId, text } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        288
+      ],
+      "id": "b6813f7c-71bf-496c-89ba-eb16cb6270dc",
+      "name": "Format history"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        816,
+        512
+      ],
+      "id": "c69921d1-2df3-4c72-8649-842f996f049c",
+      "name": "Send history",
+      "webhookId": "a94b041d-98d7-494d-aeac-e8516f44b8c2",
+      "credentials": {
+        "telegramApi": {
+          "id": "c7Oc0JWZelF8kQxn",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Message received": {
+      "main": [
+        [
+          {
+            "node": "Parse command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse command": {
+      "main": [
+        [
+          {
+            "node": "Route by command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search museum API": {
+      "main": [
+        [
+          {
+            "node": "Find artwork",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find artwork": {
+      "main": [
+        [
+          {
+            "node": "Artwork found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send artwork": {
+      "main": [
+        []
+      ]
+    },
+    "Art note": {
+      "main": [
+        [
+          {
+            "node": "Note or fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Art note",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Note or fallback": {
+      "main": [
+        [
+          {
+            "node": "Format caption",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format caption": {
+      "main": [
+        [
+          {
+            "node": "Send artwork",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save mood log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by command": {
+      "main": [
+        [
+          {
+            "node": "Mood provided?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get history",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Help message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Usage message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mood provided?": {
+      "main": [
+        [
+          {
+            "node": "Search museum API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Usage message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Artwork found?": {
+      "main": [
+        [
+          {
+            "node": "Art note",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No artwork found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get history": {
+      "main": [
+        [
+          {
+            "node": "Format history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format history": {
+      "main": [
+        [
+          {
+            "node": "Send history",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ab23a5f6-360f-41c9-a016-2f78ff34f001",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "01afffb0caa5b84b878c0ce9dd34f27c7684e3e1c3408df4d29f9b1776ac1007"
+  },
+  "nodeGroups": [],
+  "id": "nAPysL569LaDDc0S",
+  "tags": []
+}
