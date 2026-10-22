@@ -21,38 +21,20 @@ Many people find art history intimidating and museum websites are searched by ti
 | `/mood` (no mood) or any other text | A usage message with an example |
 | A mood the museum cannot match | A message asking you to try another mood |
 
-## 3. Architecture
+## Architecture
 
-Every arrow is labelled with the data it carries.
+<img width="1333" height="565" alt="Capture d’écran 2026-10-22 à 17 46 28" src="https://github.com/user-attachments/assets/a1559bda-605d-4b72-a023-58731edf4815" />
 
-```mermaid
-flowchart LR
-  A["Telegram Trigger<br/>Message received"] -->|"chatId, text"| B["Code<br/>Parse command"]
-  B -->|"chatId, command, mood, keyword, valid"| C{"Switch<br/>Route by command"}
-  C -->|"output mood"| D{"IF<br/>Mood provided?"}
-  D -->|"true: keyword"| E["HTTP Request<br/>Search museum API"]
-  E -->|"list of artworks"| F["Code<br/>Find artwork"]
-  F -->|"title, artist, date, imageUrl, found"| G{"IF<br/>Artwork found?"}
-  G -->|"true: artwork details"| H["Basic LLM Chain<br/>Art note + Groq Chat Model"]
-  H -->|"AI text"| I["Set<br/>Note or fallback"]
-  I -->|"note"| J["Code<br/>Format caption"]
-  J -->|"imageUrl, caption"| K["Telegram<br/>Send artwork"]
-  J -->|"chatId, mood, title, artist"| L["Supabase<br/>Save mood log"]
-  G -->|"false"| M["Telegram<br/>No artwork found"]
-  D -->|"false"| U["Telegram<br/>Usage message"]
-  C -->|"Fallback"| U
-  C -->|"output history"| N["Supabase<br/>Get history"]
-  N -->|"rows"| O["Code<br/>Format history"]
-  O -->|"text list"| P["Telegram<br/>Send history"]
-  C -->|"output help"| Q["Telegram<br/>Help message"]
-```
+<img width="1339" height="570" alt="Capture d’écran 2026-10-22 à 17 46 41" src="https://github.com/user-attachments/assets/ea91b807-cb0e-40fc-be7b-480523a3db95" />
 
-Separate error workflow, linked in the main workflow settings:
+<img width="1345" height="567" alt="Capture d’écran 2026-10-22 à 17 46 51" src="https://github.com/user-attachments/assets/80dcd007-881c-45c3-af07-ad71ed113983" />
 
-```mermaid
-flowchart LR
-  X["Error Trigger"] -->|"workflow name, failed node, error message, execution URL"| Y["Telegram<br/>Send alert"]
-```
+<img width="1328" height="560" alt="Capture d’écran 2026-10-22 à 17 47 03" src="https://github.com/user-attachments/assets/8cda440f-8811-47b8-9e88-3571ed4bf7cd" />
+
+<img width="1327" height="554" alt="Capture d’écran 2026-10-22 à 17 47 15" src="https://github.com/user-attachments/assets/f548f1df-96eb-4791-89bc-3eefc1b194ee" />
+
+<img width="1341" height="565" alt="Capture d’écran 2026-10-22 à 17 47 27" src="https://github.com/user-attachments/assets/10ee787a-9206-4425-9b4d-9e68be3c6f37" />
+
 
 ### Why each building block
 
