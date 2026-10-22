@@ -3,7 +3,7 @@
 A Telegram bot built with n8n. You send it a mood, it answers with a real public-domain artwork from a museum and a short AI-written note that teaches you something about the work and the artist.
 
 - **Bot:** [@art_and_mindset_bot](https://t.me/art_and_mindset_bot)
-- **Author:** Apolline Seguin
+- **Author:** Apolline Seguin AIDAMS 3A
 - **Hosting:** n8n Cloud (not self-hosted)
 - **Release:** `v1.0`
 
