@@ -65,7 +65,7 @@ No secret is stored in this repository. The workflow JSON only contains credenti
 |---|---|---|
 | Telegram API | Talk to [@BotFather](https://t.me/BotFather), `/newbot`, copy the token | Telegram Trigger and all Telegram nodes |
 | Groq API | [console.groq.com](https://console.groq.com) → API Keys (free plan) | Groq Chat Model |
-| Supabase API | Supabase project → Project Settings → API: Project URL and `service_role` key | Save mood log, Get history |
+| Supabase API | Supabase project → Project Settings → API: Project URL and Supabase OAuth2 key | Save mood log, Get history |
 
 `.env.example` lists these names with empty values, as a checklist. n8n Cloud stores credentials in its own encrypted store, so no `.env` file is needed to run it.
 
@@ -73,8 +73,8 @@ No secret is stored in this repository. The workflow JSON only contains credenti
 
 1. **Clone** the repository and open it:
    ```bash
-   git clone https://github.com/apolline-seguin/mood-to-masterpiece.git
-   cd mood-to-masterpiece
+   git clone https://github.com/apolline-seguin/mood-to-masterpiece-n8n
+   cd mood-to-masterpiece-n8n
    ```
 2. **Create the database table.** In Supabase, open **SQL Editor → New query**, paste and run:
    ```sql
@@ -128,7 +128,7 @@ Then open **Executions** in n8n: each run is listed, and you can open a run to s
 - **Parallel branches:** if the database save fails, the photo still arrives.
 
 
-Screenshots
+## Screenshots
 
 | What | Image |
 |---|---|
